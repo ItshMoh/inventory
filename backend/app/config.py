@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,17 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        # Hosts like Render hand out "postgres://..." which SQLAlchemy 2.0
+        # rejects. Force the explicit psycopg2 driver for any plain scheme.
+        if v.startswith("postgres://"):
+            return "postgresql+psycopg2://" + v[len("postgres://") :]
+        if v.startswith("postgresql://"):
+            return "postgresql+psycopg2://" + v[len("postgresql://") :]
+        return v
 
     @property
     def cors_origins_list(self) -> list[str]:
