@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import Modal from "../components/Modal.jsx";
 import { useToast } from "../components/Toast.jsx";
+import { EyeIcon, PlusIcon, SearchIcon, TrashIcon } from "../components/Icons.jsx";
+
+function orderNo(o) {
+  const year = new Date(o.created_at).getFullYear();
+  return `ORD-${year}-${String(o.id).padStart(3, "0")}`;
+}
 
 export default function Orders() {
   const toast = useToast();
@@ -9,6 +15,7 @@ export default function Orders() {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -30,6 +37,16 @@ export default function Orders() {
   const customerName = (id) =>
     customers.find((c) => c.id === id)?.full_name || `#${id}`;
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter(
+      (o) =>
+        orderNo(o).toLowerCase().includes(q) ||
+        customerName(o.customer_id).toLowerCase().includes(q)
+    );
+  }, [orders, customers, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const openDetail = async (id) => {
     try {
       setDetail(await api.getOrder(id));
@@ -39,7 +56,7 @@ export default function Orders() {
   };
 
   const remove = async (o) => {
-    if (!window.confirm(`Cancel/delete order #${o.id}? Stock will be restored.`)) return;
+    if (!window.confirm(`Delete ${orderNo(o)}? Stock will be restored.`)) return;
     try {
       await api.deleteOrder(o.id);
       toast.success("Order deleted");
@@ -63,41 +80,69 @@ export default function Orders() {
               : ""
           }
         >
-          + Create Order
+          <PlusIcon width={16} height={16} /> Create Order
         </button>
       </div>
 
       <div className="card">
+        <div className="search-box">
+          <SearchIcon width={18} height={18} />
+          <input
+            placeholder="Search orders..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
         {loading ? (
           <p>Loading…</p>
-        ) : orders.length === 0 ? (
-          <p className="muted">No orders yet.</p>
+        ) : filtered.length === 0 ? (
+          <p className="muted">No orders found.</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Order #</th>
+                <th>Order</th>
                 <th>Customer</th>
-                <th className="num">Items</th>
-                <th className="num">Total</th>
                 <th>Date</th>
+                <th className="num">Total</th>
                 <th className="actions-col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {orders.map((o) => (
+              {filtered.map((o) => (
                 <tr key={o.id}>
-                  <td>#{o.id}</td>
+                  <td>
+                    <div className="primary-text">{orderNo(o)}</div>
+                    <div className="sub-text">{o.items.length} items</div>
+                  </td>
                   <td>{customerName(o.customer_id)}</td>
-                  <td className="num">{o.items.length}</td>
-                  <td className="num">${Number(o.total_amount).toFixed(2)}</td>
-                  <td>{new Date(o.created_at).toLocaleString()}</td>
+                  <td className="muted">
+                    {new Date(o.created_at).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </td>
+                  <td className="num primary-text">
+                    ${Number(o.total_amount).toFixed(2)}
+                  </td>
                   <td className="actions-col">
-                    <button className="btn btn-sm" onClick={() => openDetail(o.id)}>
-                      View
+                    <button
+                      className="icon-btn"
+                      onClick={() => openDetail(o.id)}
+                      aria-label="View"
+                      title="View"
+                    >
+                      <EyeIcon width={18} height={18} />
                     </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => remove(o)}>
-                      Delete
+                    <button
+                      className="icon-btn icon-btn-danger"
+                      onClick={() => remove(o)}
+                      aria-label="Delete"
+                      title="Delete"
+                    >
+                      <TrashIcon width={18} height={18} />
                     </button>
                   </td>
                 </tr>
@@ -123,6 +168,7 @@ export default function Orders() {
         <OrderDetail
           order={detail}
           products={products}
+          title={orderNo(detail)}
           customerName={customerName(detail.customer_id)}
           onClose={() => setDetail(null)}
         />
@@ -228,7 +274,11 @@ function CreateOrder({ products, customers, onClose, onCreated }) {
               className="qty-input"
             />
             {lines.length > 1 && (
-              <button type="button" className="btn btn-sm btn-danger" onClick={() => removeLine(i)}>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={() => removeLine(i)}
+              >
                 ×
               </button>
             )}
@@ -259,10 +309,10 @@ function CreateOrder({ products, customers, onClose, onCreated }) {
   );
 }
 
-function OrderDetail({ order, products, customerName, onClose }) {
+function OrderDetail({ order, products, title, customerName, onClose }) {
   const productName = (id) => products.find((p) => p.id === id)?.name || `#${id}`;
   return (
-    <Modal title={`Order #${order.id}`} onClose={onClose}>
+    <Modal title={title} onClose={onClose}>
       <p>
         <strong>Customer:</strong> {customerName}
       </p>

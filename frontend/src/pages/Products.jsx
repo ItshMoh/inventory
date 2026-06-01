@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import Modal from "../components/Modal.jsx";
 import { useToast } from "../components/Toast.jsx";
+import { PencilIcon, PlusIcon, SearchIcon, TrashIcon } from "../components/Icons.jsx";
 
 const EMPTY = { name: "", sku: "", price: "", quantity: "" };
+const LOW_STOCK = 10;
 
 export default function Products() {
   const toast = useToast();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -25,6 +28,15 @@ export default function Products() {
   };
 
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+    );
+  }, [products, search]);
 
   const openCreate = () => {
     setEditing(null);
@@ -45,7 +57,11 @@ export default function Products() {
     if (!form.name.trim()) e.name = "Name is required";
     if (!form.sku.trim()) e.sku = "SKU is required";
     if (form.price === "" || Number(form.price) < 0) e.price = "Price must be ≥ 0";
-    if (form.quantity === "" || !Number.isInteger(Number(form.quantity)) || Number(form.quantity) < 0)
+    if (
+      form.quantity === "" ||
+      !Number.isInteger(Number(form.quantity)) ||
+      Number(form.quantity) < 0
+    )
       e.quantity = "Quantity must be a whole number ≥ 0";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -94,39 +110,61 @@ export default function Products() {
       <div className="page-header">
         <h1 className="page-title">Products</h1>
         <button className="btn btn-primary" onClick={openCreate}>
-          + Add Product
+          <PlusIcon width={16} height={16} /> Add Product
         </button>
       </div>
 
       <div className="card">
+        <div className="search-box">
+          <SearchIcon width={18} height={18} />
+          <input
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
         {loading ? (
           <p>Loading…</p>
-        ) : products.length === 0 ? (
-          <p className="muted">No products yet.</p>
+        ) : filtered.length === 0 ? (
+          <p className="muted">No products found.</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>SKU</th>
+                <th>Product Info</th>
                 <th className="num">Price</th>
-                <th className="num">Qty</th>
+                <th>Stock</th>
                 <th className="actions-col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {products.map((p) => (
+              {filtered.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.name}</td>
-                  <td>{p.sku}</td>
+                  <td>
+                    <div className="primary-text">{p.name}</div>
+                    <div className="sub-text">SKU: {p.sku}</div>
+                  </td>
                   <td className="num">${Number(p.price).toFixed(2)}</td>
-                  <td className="num">{p.quantity}</td>
+                  <td>
+                    <StockBadge qty={p.quantity} />
+                  </td>
                   <td className="actions-col">
-                    <button className="btn btn-sm" onClick={() => openEdit(p)}>
-                      Edit
+                    <button
+                      className="icon-btn"
+                      onClick={() => openEdit(p)}
+                      aria-label="Edit"
+                      title="Edit"
+                    >
+                      <PencilIcon width={18} height={18} />
                     </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => remove(p)}>
-                      Delete
+                    <button
+                      className="icon-btn icon-btn-danger"
+                      onClick={() => remove(p)}
+                      aria-label="Delete"
+                      title="Delete"
+                    >
+                      <TrashIcon width={18} height={18} />
                     </button>
                   </td>
                 </tr>
@@ -172,11 +210,7 @@ export default function Products() {
               />
             </Field>
             <div className="form-actions">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setModalOpen(false)}
-              >
+              <button type="button" className="btn" onClick={() => setModalOpen(false)}>
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -188,6 +222,11 @@ export default function Products() {
       )}
     </div>
   );
+}
+
+function StockBadge({ qty }) {
+  const tone = qty === 0 ? "danger" : qty <= LOW_STOCK ? "warn" : "success";
+  return <span className={`stock-badge stock-${tone}`}>{qty} in stock</span>;
 }
 
 function Field({ label, error, children }) {

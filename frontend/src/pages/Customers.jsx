@@ -1,14 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import Modal from "../components/Modal.jsx";
 import { useToast } from "../components/Toast.jsx";
+import {
+  MailIcon,
+  PhoneIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+} from "../components/Icons.jsx";
 
 const EMPTY = { full_name: "", email: "", phone: "" };
+
+function initials(name) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+}
 
 export default function Customers() {
   const toast = useToast();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
@@ -24,6 +41,17 @@ export default function Customers() {
   };
 
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (c) =>
+        c.full_name.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        c.phone.toLowerCase().includes(q)
+    );
+  }, [customers, search]);
 
   const openCreate = () => {
     setForm(EMPTY);
@@ -76,34 +104,58 @@ export default function Customers() {
       <div className="page-header">
         <h1 className="page-title">Customers</h1>
         <button className="btn btn-primary" onClick={openCreate}>
-          + Add Customer
+          <PlusIcon width={16} height={16} /> Add Customer
         </button>
       </div>
 
       <div className="card">
+        <div className="search-box">
+          <SearchIcon width={18} height={18} />
+          <input
+            placeholder="Search customers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
         {loading ? (
           <p>Loading…</p>
-        ) : customers.length === 0 ? (
-          <p className="muted">No customers yet.</p>
+        ) : filtered.length === 0 ? (
+          <p className="muted">No customers found.</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
+                <th>Customer</th>
+                <th>Contact Info</th>
                 <th className="actions-col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {customers.map((c) => (
+              {filtered.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.full_name}</td>
-                  <td>{c.email}</td>
-                  <td>{c.phone}</td>
+                  <td>
+                    <div className="customer-cell">
+                      <span className="avatar">{initials(c.full_name)}</span>
+                      <span className="primary-text">{c.full_name}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="contact-line">
+                      <MailIcon width={15} height={15} /> {c.email}
+                    </div>
+                    <div className="contact-line">
+                      <PhoneIcon width={15} height={15} /> {c.phone}
+                    </div>
+                  </td>
                   <td className="actions-col">
-                    <button className="btn btn-sm btn-danger" onClick={() => remove(c)}>
-                      Delete
+                    <button
+                      className="icon-btn icon-btn-danger"
+                      onClick={() => remove(c)}
+                      aria-label="Delete"
+                      title="Delete"
+                    >
+                      <TrashIcon width={18} height={18} />
                     </button>
                   </td>
                 </tr>

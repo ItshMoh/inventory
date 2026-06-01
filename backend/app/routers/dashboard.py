@@ -14,6 +14,9 @@ def get_dashboard(db: Session = Depends(get_db)):
     total_products = db.query(func.count(models.Product.id)).scalar() or 0
     total_customers = db.query(func.count(models.Customer.id)).scalar() or 0
     total_orders = db.query(func.count(models.Order.id)).scalar() or 0
+    total_revenue = db.query(
+        func.coalesce(func.sum(models.Order.total_amount), 0)
+    ).scalar() or 0
 
     low_stock = (
         db.query(models.Product)
@@ -26,5 +29,6 @@ def get_dashboard(db: Session = Depends(get_db)):
         total_products=total_products,
         total_customers=total_customers,
         total_orders=total_orders,
+        total_revenue=total_revenue,
         low_stock_products=low_stock,
     )
